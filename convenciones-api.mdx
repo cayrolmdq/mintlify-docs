@@ -3,6 +3,12 @@ title: "Convenciones de la API"
 description: "Referencia transversal: autenticación, formato de datos, errores, paginación, fechas y webhooks."
 ---
 
+<Note>
+  Esta página es una **referencia técnica para desarrolladores** que integran la
+  API de Gastuki. Si buscás cómo usar el producto, mirá [Para personas](/gastos-por-whatsapp)
+  o [Para comercios](/comercios).
+</Note>
+
 Referencia transversal para entender cómo se comportan todos los endpoints de
 Gastuki: autenticación, formato de datos, errores, paginación y fechas.
 
@@ -12,7 +18,7 @@ Todas las rutas se montan en la raíz (`/`). Los grandes grupos son:
 
 | Prefijo | Audiencia | Caso |
 |---------|-----------|------|
-| `/expenses`, `/income`, `/shopping-list`, `/budget-goals`, `/coupons`, `/happy-moment`, `/stamps`, `/campaigns`, `/referrals`, `/profile`, `/transactions`, `/bank-accounts/*`, `/phone-validation` | Cliente final | Ver [Clientes](/clientes) |
+| `/expenses`, `/income`, `/shopping-list`, `/budget-goals`, `/coupons`, `/happy-moment`, `/stamps`, `/campaigns`, `/referrals`, `/profile`, `/transactions`, `/bank-accounts/*`, `/phone-validation` | Cliente final | Ver [Para personas](/gastos-por-whatsapp) |
 | `/merchant/*` | Comercio | Ver [Comercios](/comercios) |
 | `/mcp/personal`, `/mcp/merchant`, `/.well-known/*`, `/authorize`, `/token` | Agentes de IA | Ver [MCP](/mcp) |
 | `/qr/*` | Público | Redirección a WhatsApp |
