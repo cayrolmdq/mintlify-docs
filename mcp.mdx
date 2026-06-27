@@ -1,0 +1,180 @@
+---
+title: "MCP (Model Context Protocol)"
+description: "Servidor MCP de Gastuki para que agentes de IA lean datos vía OAuth: scopes, herramientas y períodos."
+---
+
+Gastuki expone un **servidor MCP** que permite a agentes de IA (como Claude
+Desktop o Claude Web) leer datos de Gastuki de forma segura. Hay dos superficies:
+
+- **`/mcp/personal`** — herramientas de solo lectura para el **usuario final**
+  (sus gastos, ingresos, perfil).
+- **`/mcp/merchant`** — herramientas de **analítica de negocio** para el
+  **comercio** (clientes, ventas, fidelización, ruleta, cupones).
+
+<Note>
+  El servidor es **stateless y de solo lectura**: cada request crea una instancia
+  nueva del servidor MCP. La comunicación es JSON-RPC 2.0 sobre HTTP (transporte
+  Streamable HTTP). Los métodos `GET`/`DELETE` sobre estos endpoints devuelven
+  `405 Method Not Allowed`.
+</Note>
+
+## 1. Para qué sirve y quién lo usa
+
+El MCP permite que un usuario "converse" con sus datos desde un cliente de IA:
+
+- Un **comercio** puede preguntar *"¿cómo vengo este mes?"*, *"¿quiénes son mis
+  mejores clientes?"* o *"¿qué clientes dejaron de venir?"* y el agente responde
+  llamando a las herramientas del servidor.
+- Un **usuario final** puede preguntar *"¿cuánto gasté en junio?"* y el agente
+  consulta sus gastos.
+
+El login se delega a la web app de Gastuki: el usuario nunca ingresa credenciales
+en el cliente de IA.
+
+## 2. Flujo de autorización OAuth 2.1
+
+El servidor MCP está protegido por **OAuth 2.1 con Authorization Code + PKCE**.
+La aprobación (consent) se hace en la web app de Gastuki.
+
+```
+Cliente MCP (Claude)
+  1. descubre metadata OAuth (/.well-known/oauth-authorization-server)
+  2. se registra dinámicamente (/register) → client_id
+  3. inicia autorización (GET /authorize?...&code_challenge=...)
+         ↓ (el backend "estaciona" el pedido y redirige al navegador)
+Web App (pantalla de consentimiento)
+  4. asegura que el usuario esté logueado
+  5. muestra la app y los scopes solicitados
+  6. el usuario aprueba o rechaza
+         ↓ (el backend genera un código de un solo uso)
+Cliente MCP
+  7. intercambia el código + PKCE (POST /token) → access_token + refresh_token
+  8. llama herramientas (POST /mcp/personal o /mcp/merchant con Bearer)
+```
+
+**Tokens:**
+- **Access token**: JWT firmado (HS256) con `sub` (usuario), `client_id`, `scope`,
+  `aud` (recurso) y `exp`. Vigencia por defecto: 1 hora.
+- **Refresh token**: opaco, rotado en cada refresco, revocable. Vigencia por
+  defecto: 30 días.
+
+**Modo de compatibilidad:** si el servidor de autorización OAuth no está
+configurado (faltan las variables de entorno), los endpoints MCP validan
+directamente un JWT de Supabase (comportamiento v1) y **no** se aplica el control
+por scopes.
+
+## 3. Scopes (permisos)
+
+Todos los scopes de v1 son de **solo lectura**:
+
+| Scope | Audiencia | Permite |
+|-------|-----------|---------|
+| `expenses:read` | personal | Ver los propios gastos |
+| `finance:read` | personal | Ver ingresos, transacciones, totales, presupuestos |
+| `profile:read` | personal | Ver el propio perfil |
+| `advice:read` | personal | Generar recomendaciones financieras (vía LLM) |
+| `merchant:read` | comercio | Acceso base a `/mcp/merchant` (perfil/config del comercio) |
+| `merchant:reports:read` | comercio | Reportes y analítica de clientes (habilita las herramientas de reporte) |
+
+La separación entre persona "personal" y "comercio" se hace **por scopes**: un
+token sin el scope requerido por una herramienta recibe un error MCP limpio (no un
+500). El endpoint de comercio además resuelve qué comercio administra el usuario y
+acota todas las consultas a ese comercio.
+
+## 4. Herramientas personales
+
+Acotadas al perfil del usuario autenticado. Zona horaria: **Argentina (ART)**.
+
+| Herramienta | Scope | Parámetros | Devuelve |
+|-------------|-------|------------|----------|
+| `list_expenses` | `expenses:read` | `year`, `month` (1–12) | Gastos de ese mes (monto, descripción, categoría, fecha) |
+| `get_month_total` | `expenses:read` | `year`, `month` | Total gastado en el mes |
+| `get_profile` | `profile:read` | — | Nombre, teléfono, país, estado de validación |
+
+<Note>
+  Existen además herramientas de finanzas y de consejos (bajo `finance:read` /
+  `advice:read`) que siguen el mismo patrón de registro.
+</Note>
+
+## 5. Herramientas de comercio
+
+Requieren `merchant:reports:read` (salvo los recursos de perfil/config, que usan
+`merchant:read`). Casi todas aceptan un parámetro **`period`** (ver sección 6).
+
+| Herramienta | Período | Parámetros extra | Devuelve |
+|-------------|:------:|------------------|----------|
+| `get_business_overview` | ✅ | — | KPIs del negocio: clientes activos (nuevos/recurrentes), cupones activos, ingresos, ticket promedio, tasa de retorno, con variación vs. período anterior |
+| `get_customers_report` | ✅ | — | Clientes únicos/nuevos/recurrentes, top por gasto/visitas, segmentación |
+| `get_customers_insights` | — | — | Recomendaciones listas: mejor día de ventas, clientes en riesgo, tasa de retorno, crecimiento reciente |
+| `get_sales_report` | ✅ | — | Evolución de ventas semana a semana (clientes, ingresos, transacciones) |
+| `get_loyalty_report` | ✅ | `programId` (opcional) | Performance de programas de sellos: clientes activos, sellos otorgados/completados, top por sellos |
+| `get_coupons_report` | ✅ | `status` (opcional) | Performance de cupones: por cupón (código, vigencia, estado, canjes, tasa de uso) |
+| `get_happy_moments_report` | ✅ | — | Performance de la ruleta: giros, ganadores/perdedores, win rate, premio más entregado, stock por premio |
+| `get_qr_acquisition_report` | ✅ | — | Engagement por QR de fidelidad: canjes por lote, clientes únicos |
+| `get_customers_to_recover` | — | `inactiveDays` (1–365, def. 30), `limit` (1–100, def. 20) | Clientes sin compra hace N días, ordenados por recencia |
+| `get_operations_review` | — | `daysAhead` (1–90, def. 7) | Checklist operativo: premios con poco stock, cupones/programas por vencer, promos activas |
+
+<Note>
+  El servidor también puede ofrecer **prompts** (planes de crecimiento semanal,
+  recupero de clientes, revisión diaria) y **recursos** (`merchant://profile`,
+  `merchant://config`) que combinan estas herramientas.
+</Note>
+
+## 6. Períodos y rangos de fechas
+
+Las herramientas de comercio comparten un parámetro `period` unificado y
+consciente de la zona horaria:
+
+| Valor | Significado |
+|-------|-------------|
+| `today` | Desde el inicio de hoy hasta ahora |
+| `this_week` | Desde el lunes de esta semana |
+| `this_month` | Desde el 1° de este mes (valor por defecto) |
+| `last_7_days` | Últimos 7 días |
+| `last_30_days` | Últimos 30 días |
+| `last_90_days` | Últimos 90 días |
+| `custom` | Requiere `from` y `to` en formato `YYYY-MM-DD` |
+
+**Reglas para `custom`:** `from` ≤ `to` y el rango **no puede superar 90 días**.
+Las fechas se interpretan en zona local (calendario del comercio), no en UTC.
+
+Cada herramienta devuelve el rango efectivo en `period: { from, to }` para que el
+cliente pueda reconstruir exactamente el intervalo consultado.
+
+## 7. Endpoints y autenticación
+
+**Endpoints MCP:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/mcp/personal` | Herramientas personales (JSON-RPC) |
+| `POST` | `/mcp/merchant` | Herramientas de comercio (JSON-RPC) |
+
+**Endpoints OAuth** (solo si está configurado el servidor de autorización):
+| Ruta | Descripción |
+|------|-------------|
+| `/.well-known/oauth-authorization-server` | Metadata del servidor de autorización |
+| `/.well-known/oauth-protected-resource` | Metadata del recurso protegido |
+| `/register` | Registro dinámico de clientes (DCR) |
+| `/authorize` | Inicio del flujo de autorización |
+| `/token` | Intercambio de código / refresh por access token |
+| `/revoke` | Revocación de refresh token |
+
+También hay un endpoint público de descubrimiento para agentes:
+`GET /.well-known/mcp/server-card.json`.
+
+**Autenticación de cada request:** se envía un token Bearer en el header
+`Authorization`. Si OAuth está configurado, se valida el JWT propio (HS256) y se
+verifican los scopes; si no, se valida un JWT de Supabase (modo compatibilidad,
+sin control de scopes). Un token sin permiso para una herramienta recibe un error
+MCP, nunca un 500.
+
+## 8. Límites de uso
+
+El servidor aplica límites por usuario:
+
+- **RPM general**: tope de requests por minuto sobre todas las llamadas MCP.
+- **Cuota diaria de LLM**: tope diario para herramientas que invocan un LLM
+  (ej.: consejos financieros).
+
+Al superar un límite, la respuesta es **HTTP 429** con header `Retry-After` y un
+error JSON-RPC indicando cuánto esperar.

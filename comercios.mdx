@@ -1,0 +1,381 @@
+---
+title: "Comercios"
+description: "Features de negocio para merchants: alta, sellos, cupones, ruleta, recupero, reportes y más."
+---
+
+Esta guía describe todo lo que puede hacer un **comercio** en Gastuki: dar de
+alta su negocio, fidelizar clientes con sellos y cupones, gamificar con la ruleta
+(Happy Moments), recuperar clientes inactivos y medir todo con reportes.
+
+<Note>
+  **Convención importante:** todas las rutas `/merchant/*` usan **snake_case** en
+  request y response. Un middleware transforma automáticamente snake_case ↔
+  camelCase. Todos los endpoints (salvo `/merchant/leads` y assets públicos)
+  requieren token Bearer y que el usuario tenga un comercio asociado.
+</Note>
+
+## Formato de respuesta estándar
+
+```jsonc
+// Lista paginada
+{ "success": true, "data": { "items": [...], "pagination": { "page": 1, "limit": 20, "total": 0, "total_pages": 0 } } }
+
+// Lista simple        → { "success": true, "data": [ ... ] }
+// Objeto              → { "success": true, "data": { ... } }
+// Acción sin datos    → { "success": true }
+// Error               → { "success": false, "error": "mensaje" }
+```
+
+## 1. Alta y perfil del comercio
+
+**Qué hace.** El comercio se activa con sus datos legales/fiscales y gestiona su
+perfil, logo, imagen de tarjeta de sellos y su QR.
+
+**Reglas de negocio:**
+- Al activarse, el comercio entra automáticamente a un **trial de 15 días**.
+- Los datos fiscales (CUIT/`tax_id`, razón social) son **inmutables** después del
+  alta. Los demás campos (nombre comercial, dirección) sí se pueden editar.
+- Se previenen comercios duplicados por mismo CUIT o usuario.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/activate` | Activar comercio con datos legales |
+| `GET` | `/merchant/me` | Ver perfil del comercio |
+| `PATCH` | `/merchant/me` | Editar campos editables |
+| `POST` | `/merchant/me/logo` | Subir logo (multipart, máx 5MB) |
+| `POST` | `/merchant/me/stamp-card-image` | Subir imagen de tarjeta de sellos |
+| `GET` | `/merchant/me/qr` | Obtener datos del QR del comercio |
+
+Campos de activación: `merchant_name`, `legal_name`, `tax_id` (formato
+`NN-NNNNNNNN-N`), `tax_condition` (`responsable_inscripto`, `monotributo`,
+`exento`, `emprendedor_freelance`, `no_se`) y dirección.
+
+## 2. Administradores
+
+**Qué hace.** El dueño puede invitar y gestionar administradores del comercio.
+
+**Reglas:** las invitaciones tienen vencimiento; solo el dueño puede invitar/
+revocar; al dueño no se lo puede remover. Los administradores tienen acceso pleno
+a las features del comercio.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/admins` | Listar administradores |
+| `POST` | `/merchant/admins/invitations` | Crear invitación (solo dueño) |
+| `POST` | `/merchant/admins/invitations/:id/resend` | Reenviar invitación |
+| `DELETE` | `/merchant/admins/invitations/:id` | Revocar invitación |
+| `DELETE` | `/merchant/admins/:adminId` | Quitar un administrador |
+
+## 3. Onboarding (solicitud → aprobación)
+
+**Qué hace.** Captura la solicitud de alta de un comercio (con datos de
+adquisición/UTM) y el flujo de aprobación que termina activando la cuenta.
+
+**Ciclo de vida:**
+1. El usuario crea una **solicitud** → estado `in_progress`.
+2. Edita los datos de su solicitud.
+3. Un administrador la **aprueba**, lo que crea/activa el comercio y arranca el
+   trial.
+4. La solicitud pasa a `approved` y se registra el hito
+   `onboarding.commerce_created`.
+
+**Reglas:** una sola solicitud en progreso por usuario a la vez.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/applications` | Crear solicitud (acepta UTM por query) |
+| `GET` | `/merchant/applications/me` | Mi solicitud más reciente |
+| `GET` | `/merchant/applications/:id` | Detalle de la solicitud |
+| `PATCH` | `/merchant/applications/:id` | Editar la solicitud |
+| `POST` | `/merchant/applications/:id/approve` | Aprobar y activar el comercio |
+
+## 4. Suscripción y facturación
+
+**Qué hace.** Gestiona el ciclo de vida de la suscripción del comercio, desde el
+trial gratuito hasta el cobro recurrente vía **MercadoPago**.
+
+**Ciclo de vida:**
+```
+Activación → TRIAL (15 días)
+   ↓ (al vencer o al suscribir)
+ACTIVE (con preaprobación de MercadoPago)
+   ↓ (si pide cancelar)
+GRACE (período de gracia)
+   ↓ (al vencer la gracia o reactivar)
+CANCELED
+```
+
+**Reglas:**
+- El trial se inicia solo una vez (no se puede repetir).
+- La cancelación entra primero en período de **gracia** antes de cerrarse.
+- Los pagos se sincronizan automáticamente y también pueden refrescarse manual.
+- Hay un **webhook** de MercadoPago que valida la firma y sincroniza estados.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/subscriptions/status` | Estado actual de la suscripción |
+| `GET` | `/merchant/subscriptions/details` | Detalle completo |
+| `GET` | `/merchant/subscriptions/payments` | Historial de pagos (paginado) |
+| `POST` | `/merchant/subscriptions/subscribe` | Iniciar suscripción paga (MP) |
+| `POST` | `/merchant/subscriptions/cancel` | Solicitar cancelación |
+| `POST` | `/merchant/subscriptions/reactivate` | Reactivar |
+| `POST` | `/merchant/subscriptions/payments/sync` | Forzar sincronización de pagos |
+| `POST` | `/merchant/subscriptions/mercado-pago/webhook` | Webhook de MercadoPago |
+
+Estados: `FREE` · `TRIAL` · `ACTIVE` · `GRACE` · `CANCELED`.
+
+## 5. Programas de sellos
+
+**Qué hace.** El comercio crea **programas de fidelidad** donde los clientes
+acumulan sellos por compra. Al completar la tarjeta, se genera un cupón
+automáticamente.
+
+**Cómo se otorgan los sellos:**
+- **Automático** al registrarse una compra (si `auto_grant` está activo).
+- **Por QR**: el cliente escanea → el sello queda **pendiente de aprobación** del
+  comercio.
+- **Manual**: el comercio otorga sellos directamente (bonus, correcciones).
+
+**Ciclo de completado:**
+1. El cliente llega a la cantidad de sellos requerida.
+2. Se genera un cupón (con vigencia) y se le asigna.
+3. Se descuentan los sellos y se notifica al cliente.
+
+**Reglas:** un comercio puede tener varios programas activos; el cliente tiene un
+saldo de sellos por programa; se puede exigir un **monto mínimo** por sello.
+
+**Endpoints (gestión de programas):**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/stamp-programs` | Crear programa |
+| `GET` | `/merchant/stamp-programs` | Listar programas |
+| `GET` | `/merchant/stamp-programs/:id` | Detalle |
+| `PATCH` | `/merchant/stamp-programs/:id` | Editar |
+| `GET` | `/merchant/stamps/dashboard` | Métricas agregadas |
+| `GET` | `/merchant/stamp-programs/:id/customers` | Clientes del programa (con saldo) |
+| `GET` | `/merchant/stamp-programs/:id/customers/:profileId` | Saldo de un cliente |
+| `POST` | `/merchant/stamp-transactions` | Otorgar sellos manualmente |
+| `POST` | `/merchant/stamp-programs/:id/redeem` | Canjear sellos de un cliente |
+| `POST` | `/merchant/stamp-programs/:programId/card-image` | Imagen de la tarjeta |
+
+**Endpoints (QR de sellos):**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/stamp-programs/:id/qr-batches` | Activar un lote de QR |
+| `GET` | `/merchant/stamp-programs/:id/qr-batches` | Listar lotes activos |
+| `POST` | `/merchant/stamp-programs/:id/qr-batches/generate` | Generar lote (PDF) |
+
+**Endpoints (aprobaciones pendientes):**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/stamp-pending-approvals` | Sellos pendientes de aprobación |
+| `POST` | `/merchant/stamp-pending-approvals/:id/approve` | Aprobar |
+| `POST` | `/merchant/stamp-pending-approvals/:id/reject` | Rechazar (con motivo) |
+
+## 6. Cupones
+
+**Qué hace.** El comercio crea y gestiona cupones de descuento, los valida en el
+mostrador y los canjea. Los cupones también pueden crearse automáticamente (al
+completar sellos o por campañas de recupero).
+
+**Flujo de canje:**
+1. El cliente presenta el código.
+2. El comercio **valida** (chequeo de solo lectura: vigencia, estado, tope).
+3. Tras la venta, el comercio **canjea** asociando al cliente.
+
+**Reglas:** el código es único por comercio; `max_redemptions` define el tope
+(null = ilimitado); un cupón está vigente solo si está activo, dentro de fechas y
+no agotado.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/coupons` | Crear cupón |
+| `GET` | `/merchant/coupons` | Listar (paginado, filtros) |
+| `GET` | `/merchant/coupons/:id` | Detalle + canjes |
+| `PATCH` | `/merchant/coupons/:id` | Editar |
+| `POST` | `/merchant/coupons/:id/activate` | Activar |
+| `POST` | `/merchant/coupons/:id/deactivate` | Desactivar |
+| `POST` | `/merchant/coupons/validate` | Validar (solo lectura) |
+| `POST` | `/merchant/coupons/redeem` | Canjear (con `profile_id`) |
+
+Estados de canje: `assigned` (asignado, aún no usado) · `redeemed` · `expired` ·
+`cancelled`.
+
+## 7. Happy Moments / Ruleta
+
+**Qué hace.** El comercio configura una **ruleta de premios** que se ofrece a los
+clientes tras una compra. La ruleta es **probabilística** (ponderada): cada opción
+tiene su probabilidad y puede ser "no gana" o un premio.
+
+**Configuración (resumen del schema):**
+- `strategy`: `weighted`.
+- `options[]`: cada opción tiene `type` (`LOSE` o `PRIZE`), `prob` (0–1),
+  `prizeId` (si es premio) y `display` (nombre, icono, color).
+- `constraints`: límite de premios por día por cliente y condiciones de disparo
+  (compras mínimas en el comercio, monto mínimo, requiere perfil registrado, etc.).
+
+**Flujo del premio:**
+1. El cliente gira y, si gana, el premio queda registrado **sin entregar**.
+2. El comercio ve en el dashboard los premios pendientes de entrega.
+3. Al entregarlo en el local, lo marca como **entregado**.
+
+**Reglas:** una configuración activa por comercio; los premios pueden tener stock
+finito o ilimitado; no se puede borrar un premio en uso.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/happy-moments/configs` | Crear/actualizar configuración |
+| `GET` | `/merchant/happy-moments/configs` | Ver configuración activa |
+| `PATCH` | `/merchant/happy-moments/configs/:id` | Activar/desactivar |
+| `POST` | `/merchant/happy-moments/prizes` | Crear premio |
+| `GET` | `/merchant/happy-moments/prizes` | Listar premios |
+| `PATCH` | `/merchant/happy-moments/prizes/:id` | Editar premio |
+| `DELETE` | `/merchant/happy-moments/prizes/:id` | Borrar premio |
+| `GET` | `/merchant/happy-moments/spins` | Listar giros (paginado, filtros) |
+| `POST` | `/merchant/happy-moments/spins/:id/deliver` | Marcar premio entregado |
+| `GET` | `/merchant/happy-moments/dashboard` | Métricas de la ruleta |
+
+## 8. Clientes
+
+**Qué hace.** El comercio busca clientes por teléfono y consulta su información
+consolidada.
+
+**Reglas:** la búsqueda es de solo lectura (el comercio no crea clientes); el
+teléfono debe estar normalizado a formato E.164.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/customers/lookup?phone=...` | Buscar cliente por teléfono |
+
+<Note>
+  El detalle de insights de clientes (segmentos, tendencias, embudo) se accede vía
+  los reportes (sección 10).
+</Note>
+
+## 9. Recupero de clientes
+
+**Qué hace.** El comercio identifica clientes inactivos (sin compra en N días) y
+lanza una **campaña de recupero**: se crea un cupón y se asigna a cada cliente
+inactivo para reactivarlo.
+
+**Reglas:**
+- **Cooldown de 24 h** entre campañas exitosas.
+- Si todas las asignaciones fallan, la campaña no arma el cooldown (se puede
+  reintentar).
+- El envío por WhatsApp es *fire-and-forget*: si falla, no se revierte la
+  asignación del cupón.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/recovery-campaign` | Lanzar campaña (con umbral de días) |
+
+Respuesta: `{ success, data: { sent_to_count, coupon_id } }`. Si hay cooldown
+activo → HTTP 429.
+
+## 10. Reportes y analítica
+
+**Qué hace.** Dashboards y reportes en tiempo real sobre cupones, sellos, ruleta,
+clientes y ventas, con filtro por rango de fechas.
+
+**Reglas:** el rango máximo es de **90 días**; si no se especifica, se usan los
+últimos 30 días.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/reports/dashboard` | Dashboard general |
+| `GET` | `/merchant/reports/coupons` | Reporte de cupones |
+| `GET` | `/merchant/reports/stamps` | Reporte de sellos |
+| `GET` | `/merchant/reports/happy-moments` | Reporte de ruleta |
+| `GET` | `/merchant/reports/customers` | Reporte de clientes |
+| `GET` | `/merchant/reports/customers/summary` | KPIs + comparación con período anterior |
+| `GET` | `/merchant/reports/customers/trend` | Tendencia de clientes (serie temporal) |
+| `GET` | `/merchant/reports/customers/segments` | Segmentación por engagement |
+| `GET` | `/merchant/reports/customers/funnel` | Embudo de conversión |
+| `GET` | `/merchant/reports/customers/insights` | Insights y recomendaciones |
+
+**Definiciones de métricas:**
+- **Clientes activos**: perfiles únicos con alguna transacción en el rango.
+- **Tasa de retorno**: clientes con 2+ compras / total de clientes.
+- **Tasa de canje**: cupones canjeados / cupones emitidos.
+- **Win rate (ruleta)**: giros ganados / giros totales.
+- **Ticket promedio**: ingresos totales / cantidad de transacciones.
+
+## 11. Promos (vista unificada)
+
+**Qué hace.** Un único endpoint que agrega todas las promociones activas (cupones
++ programas de sellos + configuración de ruleta) para una vista de dashboard.
+
+**Reglas:** tolera fallas parciales: si una fuente falla, devuelve las otras y
+documenta el error.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/promos` | Cupones + sellos + ruleta activos |
+
+## 12. Ventas
+
+**Qué hace.** Lista las ventas recientes del comercio.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/sales?order=desc&limit=3` | Ventas recientes (límite 1–20) |
+
+## 13. Hitos (milestones) de onboarding
+
+**Qué hace.** El sistema registra el progreso de onboarding del comercio mediante
+**hitos** (crear comercio, descargar QR, primer cliente, etc.). El frontend puede
+reportar hitos que dispara el usuario; el backend registra eventos del sistema.
+
+**Reglas:** registrar un hito es **idempotente** (la primera vez se persiste; las
+siguientes son no-op). Solo se aceptan claves marcadas como reportables por
+frontend.
+
+**Hitos canónicos:** `onboarding.commerce_created`, `onboarding.first_promo`,
+`onboarding.qr_downloaded`, `onboarding.first_customer`, `onboarding.welcome_seen`,
+`onboarding.celebration_seen`.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/merchant/onboarding` | Estado de onboarding y pasos |
+| `POST` | `/merchant/milestones` | Registrar un hito reportado por el cliente |
+
+## 14. Leads (captación pública)
+
+**Qué hace.** Endpoint **público** (sin auth) para que un negocio interesado deje
+sus datos. Valida la información y notifica por email al equipo de Gastuki.
+
+**Reglas:** rate limiting por IP; valida nombre, email, teléfono (formato
+Argentina), nombre del negocio, ciudad y rubro.
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/merchant/leads` | Enviar lead (público, rate-limited) |
+
+## Resumen de features
+
+| Feature | Crear | Listar | Acción principal |
+|---------|-------|--------|------------------|
+| Comercio | `POST /merchant/activate` | `GET /merchant/me` | Subir logo, obtener QR |
+| Onboarding | `POST /merchant/applications` | `GET /merchant/applications/me` | Aprobar |
+| Suscripción | — | `GET /merchant/subscriptions/status` | Suscribir / cancelar |
+| Sellos | `POST /merchant/stamp-programs` | `GET /merchant/stamp-programs` | Canjear, aprobar pendientes |
+| Cupones | `POST /merchant/coupons` | `GET /merchant/coupons` | Validar, canjear |
+| Ruleta | `POST /merchant/happy-moments/configs` | `GET /merchant/happy-moments/spins` | Entregar premio |
+| Clientes | — | `GET /merchant/customers/lookup` | Buscar por teléfono |
+| Recupero | — | — | `POST /merchant/recovery-campaign` |
+| Reportes | — | `GET /merchant/reports/*` | Analítica |
+| Leads | `POST /merchant/leads` | — | Captación pública |
+| Hitos | `POST /merchant/milestones` | `GET /merchant/onboarding` | Tracking de onboarding |

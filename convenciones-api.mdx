@@ -1,0 +1,137 @@
+---
+title: "Convenciones de la API"
+description: "Referencia transversal: autenticación, formato de datos, errores, paginación, fechas y webhooks."
+---
+
+Referencia transversal para entender cómo se comportan todos los endpoints de
+Gastuki: autenticación, formato de datos, errores, paginación y fechas.
+
+## 1. Superficies y montaje de rutas
+
+Todas las rutas se montan en la raíz (`/`). Los grandes grupos son:
+
+| Prefijo | Audiencia | Caso |
+|---------|-----------|------|
+| `/expenses`, `/income`, `/shopping-list`, `/budget-goals`, `/coupons`, `/happy-moment`, `/stamps`, `/campaigns`, `/referrals`, `/profile`, `/transactions`, `/bank-accounts/*`, `/phone-validation` | Cliente final | Ver [Clientes](/clientes) |
+| `/merchant/*` | Comercio | Ver [Comercios](/comercios) |
+| `/mcp/personal`, `/mcp/merchant`, `/.well-known/*`, `/authorize`, `/token` | Agentes de IA | Ver [MCP](/mcp) |
+| `/qr/*` | Público | Redirección a WhatsApp |
+| `/webhooks/*`, `/whatsapp-cloud` | Integraciones | Webhooks entrantes |
+| `/api-docs` | Documentación | Swagger UI / OpenAPI |
+
+## 2. Autenticación
+
+- **WhatsApp**: el usuario se identifica por su número de teléfono (normalizado a
+  E.164). No hay token; el canal es el identificador.
+- **API web (cliente)**: token **Bearer de Supabase** (`Authorization: Bearer
+  <token>`). El ID de usuario sale del JWT.
+- **API de comercio (`/merchant/*`)**: token Bearer + el usuario debe tener un
+  comercio asociado. Algunas acciones (administradores) requieren ser **dueño**.
+- **MCP**: token OAuth propio (o JWT de Supabase en modo compatibilidad). Ver
+  [MCP](/mcp).
+- **Endpoints públicos**: `POST /merchant/leads`, `GET /qr/:merchantCode`, assets
+  públicos y los webhooks no requieren auth (los webhooks validan firma).
+- **Admin interno**: ciertas operaciones administrativas usan API key.
+
+## 3. snake_case vs. camelCase
+
+Esta es una de las convenciones **más importantes** y fuente de bugs si se ignora:
+
+- Las rutas **`/merchant/*`** usan **snake_case** en request y response. Un
+  middleware transforma automáticamente:
+  - Request: `snake_case` → `camelCase` (antes de llegar a la lógica).
+  - Response: `camelCase` → `snake_case` (antes de salir).
+- El **resto de las rutas** usan **camelCase** directamente.
+
+<Warning>
+  Cuando el request incluye claves definidas por el usuario (ej.: nombres de
+  features como `happy_moments`), el middleware también las transforma a camelCase
+  (`happyMoments`). La lógica que valide esas claves debe normalizarlas. Esto
+  aplica especialmente a payloads con claves dinámicas en rutas de comercio.
+</Warning>
+
+La transformación de response es **recursiva**, e incluye el contenido de campos
+JSONB.
+
+## 4. Formato de respuesta
+
+### Comercio (`/merchant/*`) — formato estándar obligatorio
+
+```jsonc
+// Lista paginada
+{ "success": true, "data": { "items": [ ... ], "pagination": { "page": 1, "limit": 20, "total": 0, "total_pages": 0 } } }
+
+// Lista simple (sin paginación)
+{ "success": true, "data": [ ... ] }
+
+// Objeto único
+{ "success": true, "data": { ... } }
+
+// Acción sin datos
+{ "success": true }
+
+// Error
+{ "success": false, "error": "mensaje" }
+```
+
+**Reglas:**
+- La clave envoltorio es siempre **`data`** (nunca el nombre del dominio como
+  `spins`, `coupons`, `customers`).
+- Los arrays paginados van en **`data.items`** (nunca `data.data`).
+- La paginación usa `totalPages` (camelCase interno) → el middleware lo convierte a
+  `total_pages` en la respuesta.
+
+### Otras rutas
+
+Siguen el mismo espíritu (`{ success, data | error }`) pero en camelCase.
+
+## 5. Errores
+
+| Código | Significado |
+|--------|-------------|
+| `400` | Error de validación (input inválido) |
+| `401` | No autenticado (token faltante o inválido) |
+| `403` | No autorizado (no es comercio, no es dueño, scope insuficiente) |
+| `404` | Recurso no encontrado |
+| `409` | Conflicto (ej.: código duplicado, ya activado) |
+| `422` | No procesable (ej.: sellos insuficientes, cupón vencido) |
+| `429` | Demasiados requests (rate limiting / cooldown) |
+| `500` | Error interno |
+
+El cuerpo de error siempre tiene la forma `{ success: false, error: "..." }`. Para
+operaciones por lote puede incluir `errors: [...]`.
+
+## 6. Paginación
+
+- Query params: `page` (1-indexado) y `limit`.
+- Las respuestas paginadas de comercio usan la estructura `data.items` +
+  `data.pagination` (ver sección 4).
+
+## 7. Fechas y zona horaria
+
+- Gastuki opera con calendario de **Argentina (ART, UTC−3)**.
+- Los **totales mensuales** se calculan con límites de mes en ART (tanto en la API
+  HTTP como en MCP devuelven los mismos agregados).
+- Los **reportes de comercio** aceptan rango de fechas con tope de **90 días**; si
+  no se especifica, usan los últimos 30 días.
+- Los timestamps de respuesta son ISO 8601.
+- En MCP, los rangos de período se resuelven en zona local y se devuelve el rango
+  efectivo en `period: { from, to }` (ver [MCP](/mcp#6-períodos-y-rangos-de-fechas)).
+
+## 8. Webhooks
+
+| Ruta | Origen | Propósito |
+|------|--------|-----------|
+| `/webhooks/mercadopago` y `/merchant/subscriptions/mercado-pago/webhook` | MercadoPago | Sincronizar suscripciones y pagos (valida firma) |
+| Webhook de eventos | WhatsApp (Gupshup) | Mensajes entrantes |
+| `/whatsapp-cloud` | WhatsApp Cloud API | Webhook entrante |
+| Estado de mensajes | Gupshup | Estados de entrega |
+
+Los webhooks no requieren token Bearer pero validan su autenticidad (firma /
+verificación de origen).
+
+## Más información
+
+- **API interactiva**: `/api-docs` (Swagger UI).
+- Esta documentación describe el **comportamiento funcional** del producto, no su
+  implementación.
