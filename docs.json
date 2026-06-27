@@ -3,9 +3,9 @@
   "theme": "mint",
   "name": "Gastuki",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#45958E",
+    "light": "#6FBDB5",
+    "dark": "#357770"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -50,10 +50,7 @@
       ]
     }
   },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
+  "logo": "/logo/gastuki.png",
   "navbar": {
     "primary": {
       "type": "button",
