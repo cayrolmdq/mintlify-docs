@@ -1,20 +1,80 @@
 ---
-title: "Introduction"
-description: "Welcome to your project"
+title: "Introducción"
+description: "Documentación funcional de Gastuki: gastos por WhatsApp, fidelización para comercios y acceso vía MCP."
 ---
 
-Write a short description of your product here. What it does, who it's for, and what they can accomplish with it.
+Gastuki es una plataforma para **gestionar gastos personales por WhatsApp** y un
+**programa de fidelización y analítica para comercios**. Esta documentación
+explica **qué hace** cada feature y **cómo funciona** desde el punto de vista del
+usuario, no cómo está implementada internamente.
 
-<Tip>
-  Ready to make this your own? Start by editing this page. Update your `docs.json` file to customize your site. Then fill out the [Quickstart](/quickstart) page.
-</Tip>
+Está pensada para que cualquier persona (producto, soporte, comercios,
+integradores) entienda los requerimientos funcionales del producto.
 
-<Card title="Quickstart" icon="rocket" href="/quickstart">
-  This card links to the quickstart page in your project.
-</Card>
-<Card title="Components" icon="puzzle-piece" href="https://mintlify.com/docs/components">
-  Add cards, callouts, steps, tabs, and more to design and structure your pages.
-</Card>
-<Card title="Settings" icon="gear" href="https://mintlify.com/docs/organize/settings">
-  Set your site name, branding, and navigation in the `docs.json` file.
-</Card>
+## ¿Qué es Gastuki?
+
+Gastuki tiene tres audiencias y tres superficies de uso:
+
+| Audiencia | Quién es | Cómo lo usa |
+|-----------|----------|-------------|
+| **Clientes** (usuarios finales) | Personas que quieren controlar sus gastos | WhatsApp (texto, voz, imagen) + web app |
+| **Comercios** (merchants) | Negocios que quieren fidelizar clientes | Panel web / API `/merchant/*` |
+| **Agentes de IA** (MCP) | Comercios y usuarios que consultan sus datos desde Claude u otro cliente | Servidor MCP por OAuth |
+
+El corazón del producto es el **asistente de WhatsApp**: el cliente le escribe en
+lenguaje natural ("gasté $500 en pan") y la IA extrae, categoriza y registra la
+operación. Sobre esa base se construyen presupuestos, listas de compras, cupones,
+sellos de fidelidad, ruleta de premios, campañas y reportes.
+
+## Mapa del sitio
+
+<CardGroup cols={2}>
+  <Card title="Clientes" icon="user" href="/clientes">
+    Todas las features del usuario final: gastos, ingresos, transferencias,
+    listas de compras, presupuestos, cupones, ruleta, sellos, campañas,
+    verificación bancaria, recordatorios y FAQ.
+  </Card>
+  <Card title="Comercios" icon="store" href="/comercios">
+    Features de negocio: alta y onboarding, suscripción y facturación, programas
+    de sellos, cupones, Happy Moments (ruleta), clientes, recupero, reportes,
+    leads e hitos.
+  </Card>
+  <Card title="MCP" icon="robot" href="/mcp">
+    Servidor MCP para consultar datos desde agentes de IA: flujo OAuth, scopes,
+    herramientas disponibles y manejo de períodos.
+  </Card>
+  <Card title="Convenciones de la API" icon="code" href="/convenciones-api">
+    Autenticación, formato de respuestas, transformación snake_case ↔ camelCase,
+    errores, paginación, fechas y zona horaria.
+  </Card>
+</CardGroup>
+
+## Conceptos clave (glosario rápido)
+
+- **Cliente / Usuario final**: persona identificada por su número de teléfono (WhatsApp).
+- **Comercio / Merchant**: negocio dado de alta con datos legales (CUIT).
+- **Perfil (profile)**: registro del usuario final dentro de Gastuki.
+- **Gasto (expense)**: salida de dinero registrada por el usuario.
+- **Ingreso (income)**: entrada de dinero registrada por el usuario.
+- **Sello (stamp)**: punto de fidelidad que un comercio otorga por compra.
+- **Cupón (coupon)**: código de descuento o beneficio canjeable.
+- **Happy Moment / Ruleta**: juego de premios que se ofrece tras una compra.
+- **Cupón de recupero**: cupón que se asigna a clientes inactivos para reactivarlos.
+- **MCP**: protocolo que permite a un agente de IA leer datos de Gastuki vía OAuth.
+
+<Note>
+  **Zona horaria:** Gastuki opera con calendario de Argentina (ART, UTC−3). Los
+  totales mensuales y los rangos de período se calculan respetando esa zona.
+</Note>
+
+## Cómo está organizada la plataforma (alto nivel)
+
+```
+Cliente final ──WhatsApp/Web──▶ API Gastuki ──▶ Comercio (panel/API)
+                                    │
+                                    └── Servidor MCP ──OAuth──▶ Agentes de IA (Claude, etc.)
+```
+
+El backend sigue **Clean Architecture + DDD**. Cada feature de negocio vive en su
+propio módulo. Esta documentación describe el **comportamiento funcional**, no el
+código.

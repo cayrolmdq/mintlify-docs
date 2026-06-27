@@ -1,28 +1,17 @@
-# Mintlify Starter Kit
+# Documentación de Gastuki
 
-Use the starter kit to get your docs deployed and ready to customize.
+Sitio de documentación funcional de **Gastuki**: gestión de gastos personales por
+WhatsApp, programa de fidelización y analítica para comercios, y servidor MCP para
+agentes de IA. Construido con [Mintlify](https://mintlify.com).
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+## Estructura
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
-
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
-
-## AI-assisted writing
-
-Set up your AI coding tool to work with Mintlify:
-
-```bash
-npx skills add https://mintlify.com/docs
-```
-
-This command installs Mintlify's documentation skill for your configured AI tools like Claude Code, Cursor, Windsurf, and others. The skill includes component reference, writing standards, and workflow guidance.
-
-See the [AI tools guides](/ai-tools) for tool-specific setup.
+- `index.mdx` — Introducción y mapa del sitio
+- `clientes.mdx` — Features del usuario final
+- `comercios.mdx` — Features de negocio (merchants)
+- `mcp.mdx` — Servidor MCP (Model Context Protocol)
+- `convenciones-api.mdx` — Convenciones transversales de la API
+- `docs.json` — Configuración de navegación, branding y tema
 
 ## Development
 
