@@ -25,15 +25,24 @@
 
 ## Style preferences
 
-{/* Add any project-specific style rules below */}
+Audience by section:
 
-- Use active voice and second person ("you")
-- Keep sentences concise — one idea per sentence
-- Use sentence case for headings
-- Bold for UI elements: Click **Settings**
-- Code formatting for file names, commands, paths, and code references
+- **Público general (SEO/AEO):** todo salvo "Para desarrolladores". Escribir para
+  cualquier persona, no para perfiles técnicos.
+- **Técnico:** la sección "Para desarrolladores" (`mcp.mdx`, `convenciones-api.mdx`).
+
+Reglas para las páginas de público general:
+
+- Español rioplatense (Argentina), voseo, segunda persona ("vos/tu")
+- Tono cercano y sin jerga; explicar conceptos, no listar endpoints
+- Optimizar para SEO y AEO: títulos en forma de pregunta, una respuesta directa al
+  inicio, secciones de "Preguntas frecuentes" (`<AccordionGroup>`), enlaces internos
+- No incluir tablas de endpoints, snake_case/camelCase ni códigos HTTP en páginas
+  de público general (eso va solo en la sección técnica)
+- Una idea por oración; usar componentes Mintlify (`<Card>`, `<Steps>`, `<Note>`,
+  `<Tip>`, `<Accordion>`) donde aporten
 
 ## Content boundaries
 
-{/* Define what should and shouldn't be documented */}
-{/* Example: Don't document internal admin features */}
+- Documentar **comportamiento funcional y beneficios**, no implementación interna
+- No documentar operaciones de admin interno ni detalles sensibles de seguridad

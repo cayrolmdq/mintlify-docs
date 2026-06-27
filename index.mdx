@@ -1,80 +1,66 @@
 ---
-title: "Introducción"
-description: "Documentación funcional de Gastuki: gastos por WhatsApp, fidelización para comercios y acceso vía MCP."
+title: "Gastuki: controlá tus gastos por WhatsApp"
+sidebarTitle: "Qué es Gastuki"
+description: "Gastuki es la app argentina para controlar gastos por WhatsApp y fidelizar clientes en comercios. Registrá gastos hablando, sin planillas ni apps complicadas."
+icon: "house"
 ---
 
-Gastuki es una plataforma para **gestionar gastos personales por WhatsApp** y un
-**programa de fidelización y analítica para comercios**. Esta documentación
-explica **qué hace** cada feature y **cómo funciona** desde el punto de vista del
-usuario, no cómo está implementada internamente.
+**Gastuki es una app que te ayuda a controlar tus gastos escribiendo (o mandando un audio) por WhatsApp, y un programa de fidelización para comercios.** No tenés que descargar nada nuevo ni aprender a usar planillas: le escribís "gasté $500 en pan" y Gastuki lo registra, lo categoriza y te muestra cómo venís en el mes.
 
-Está pensada para que cualquier persona (producto, soporte, comercios,
-integradores) entienda los requerimientos funcionales del producto.
-
-## ¿Qué es Gastuki?
-
-Gastuki tiene tres audiencias y tres superficies de uso:
-
-| Audiencia | Quién es | Cómo lo usa |
-|-----------|----------|-------------|
-| **Clientes** (usuarios finales) | Personas que quieren controlar sus gastos | WhatsApp (texto, voz, imagen) + web app |
-| **Comercios** (merchants) | Negocios que quieren fidelizar clientes | Panel web / API `/merchant/*` |
-| **Agentes de IA** (MCP) | Comercios y usuarios que consultan sus datos desde Claude u otro cliente | Servidor MCP por OAuth |
-
-El corazón del producto es el **asistente de WhatsApp**: el cliente le escribe en
-lenguaje natural ("gasté $500 en pan") y la IA extrae, categoriza y registra la
-operación. Sobre esa base se construyen presupuestos, listas de compras, cupones,
-sellos de fidelidad, ruleta de premios, campañas y reportes.
-
-## Mapa del sitio
-
-<CardGroup cols={2}>
-  <Card title="Clientes" icon="user" href="/clientes">
-    Todas las features del usuario final: gastos, ingresos, transferencias,
-    listas de compras, presupuestos, cupones, ruleta, sellos, campañas,
-    verificación bancaria, recordatorios y FAQ.
+<CardGroup cols={3}>
+  <Card title="Para personas" icon="user" href="/gastos-por-whatsapp">
+    Controlá tus gastos, armá presupuestos y ahorrá, todo desde WhatsApp.
   </Card>
-  <Card title="Comercios" icon="store" href="/comercios">
-    Features de negocio: alta y onboarding, suscripción y facturación, programas
-    de sellos, cupones, Happy Moments (ruleta), clientes, recupero, reportes,
-    leads e hitos.
+  <Card title="Para comercios" icon="store" href="/comercios">
+    Fidelizá clientes con sellos, cupones y premios, y medí tu negocio.
   </Card>
-  <Card title="MCP" icon="robot" href="/mcp">
-    Servidor MCP para consultar datos desde agentes de IA: flujo OAuth, scopes,
-    herramientas disponibles y manejo de períodos.
-  </Card>
-  <Card title="Convenciones de la API" icon="code" href="/convenciones-api">
-    Autenticación, formato de respuestas, transformación snake_case ↔ camelCase,
-    errores, paginación, fechas y zona horaria.
+  <Card title="Para desarrolladores" icon="code" href="/mcp">
+    Conectá agentes de IA y la API de Gastuki a tus datos.
   </Card>
 </CardGroup>
 
-## Conceptos clave (glosario rápido)
+## ¿Qué es Gastuki?
 
-- **Cliente / Usuario final**: persona identificada por su número de teléfono (WhatsApp).
-- **Comercio / Merchant**: negocio dado de alta con datos legales (CUIT).
-- **Perfil (profile)**: registro del usuario final dentro de Gastuki.
-- **Gasto (expense)**: salida de dinero registrada por el usuario.
-- **Ingreso (income)**: entrada de dinero registrada por el usuario.
-- **Sello (stamp)**: punto de fidelidad que un comercio otorga por compra.
-- **Cupón (coupon)**: código de descuento o beneficio canjeable.
-- **Happy Moment / Ruleta**: juego de premios que se ofrece tras una compra.
-- **Cupón de recupero**: cupón que se asigna a clientes inactivos para reactivarlos.
-- **MCP**: protocolo que permite a un agente de IA leer datos de Gastuki vía OAuth.
+Gastuki es una plataforma argentina con dos grandes usos:
 
-<Note>
-  **Zona horaria:** Gastuki opera con calendario de Argentina (ART, UTC−3). Los
-  totales mensuales y los rangos de período se calculan respetando esa zona.
-</Note>
+- **Finanzas personales por WhatsApp.** Registrás gastos e ingresos en lenguaje natural y Gastuki los organiza por vos. Sumás presupuestos, listas de compras, alertas y un resumen semanal de en qué se te va la plata.
+- **Fidelización para comercios.** Los negocios premian a sus clientes con sellos, cupones y una ruleta de premios, y acceden a reportes para entender y recuperar clientes.
 
-## Cómo está organizada la plataforma (alto nivel)
+Todo gira alrededor de un asistente que entiende cómo hablás: le escribís como le escribirías a un amigo y él hace el trabajo aburrido de anotar y clasificar.
 
-```
-Cliente final ──WhatsApp/Web──▶ API Gastuki ──▶ Comercio (panel/API)
-                                    │
-                                    └── Servidor MCP ──OAuth──▶ Agentes de IA (Claude, etc.)
-```
+## ¿Cómo funciona, en pocas palabras?
 
-El backend sigue **Clean Architecture + DDD**. Cada feature de negocio vive en su
-propio módulo. Esta documentación describe el **comportamiento funcional**, no el
-código.
+1. **Le escribís por WhatsApp.** Texto, audio o una foto del ticket. Ejemplo: *"pagué 1200 de café"*.
+2. **La IA entiende y registra.** Detecta el monto, la categoría (cafetería → salidas) y la fecha.
+3. **Te muestra cómo vas.** Cuánto gastaste en el mes, cuánto te queda de presupuesto y tu saldo.
+4. **Ganás beneficios.** Si comprás en comercios adheridos, sumás sellos y podés ganar cupones y premios.
+
+## ¿Para quién es Gastuki?
+
+| Si sos... | Gastuki te sirve para... |
+|-----------|--------------------------|
+| Una persona que quiere ordenar su plata | Registrar gastos sin esfuerzo y dejar de llegar al límite sin saber por qué |
+| Alguien que quiere ahorrar | Ponerte objetivos y ver tu progreso en tiempo real |
+| Un comercio o emprendedor | Fidelizar clientes y que vuelvan más seguido |
+| Un equipo técnico | Integrar tus datos con IA mediante el servidor MCP |
+
+## ¿Por qué usar WhatsApp en vez de una app aparte?
+
+Porque ya lo tenés abierto todo el día. La mayoría abandona las apps de gastos porque cargar cada compra es tedioso. Con Gastuki, anotar un gasto toma lo mismo que mandar un mensaje, así que **realmente lo terminás haciendo**, que es lo que hace que funcione.
+
+## Preguntas frecuentes
+
+<AccordionGroup>
+  <Accordion title="¿Necesito instalar una aplicación?">
+    No. Gastuki funciona dentro de WhatsApp, que ya tenés instalado. Hay además una web app para ver tus gastos y reportes con más detalle.
+  </Accordion>
+  <Accordion title="¿Puedo registrar gastos con un audio o una foto?">
+    Sí. Podés mandar un mensaje de voz o una foto del ticket y Gastuki extrae el monto automáticamente.
+  </Accordion>
+  <Accordion title="¿Sirve para comercios además de para personas?">
+    Sí. Los comercios usan Gastuki para fidelizar clientes con sellos, cupones y una ruleta de premios, y para ver reportes de su negocio. Mirá la sección [Para comercios](/comercios).
+  </Accordion>
+  <Accordion title="¿Gastuki funciona en Argentina?">
+    Sí, está pensado para Argentina: trabaja con pesos, reconoce comprobantes de transferencia locales (CBU/CVU) y usa el calendario argentino (ART, UTC−3).
+  </Accordion>
+</AccordionGroup>

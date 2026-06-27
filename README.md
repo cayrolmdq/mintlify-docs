@@ -4,13 +4,24 @@ Sitio de documentación funcional de **Gastuki**: gestión de gastos personales 
 WhatsApp, programa de fidelización y analítica para comercios, y servidor MCP para
 agentes de IA. Construido con [Mintlify](https://mintlify.com).
 
+El sitio público (todo salvo MCP y la referencia de API) está escrito para el
+público general y optimizado para SEO y AEO. Las páginas técnicas viven en la
+sección "Para desarrolladores".
+
 ## Estructura
 
-- `index.mdx` — Introducción y mapa del sitio
-- `clientes.mdx` — Features del usuario final
-- `comercios.mdx` — Features de negocio (merchants)
-- `mcp.mdx` — Servidor MCP (Model Context Protocol)
-- `convenciones-api.mdx` — Convenciones transversales de la API
+- `index.mdx` — Qué es Gastuki (introducción)
+- **Para personas**
+  - `gastos-por-whatsapp.mdx` — Controlar gastos por WhatsApp
+  - `presupuestos-y-ahorro.mdx` — Presupuestos y objetivos de ahorro
+  - `cupones-sellos-y-premios.mdx` — Cupones, sellos y premios
+- **Para comercios**
+  - `comercios.mdx` — Fidelización para comercios (overview)
+  - `programa-de-fidelizacion.mdx` — Sellos, cupones y ruleta
+  - `analitica-de-clientes.mdx` — Reportes y analítica
+- **Para desarrolladores**
+  - `mcp.mdx` — Servidor MCP (Model Context Protocol)
+  - `convenciones-api.mdx` — Convenciones de la API REST
 - `docs.json` — Configuración de navegación, branding y tema
 
 ## Development

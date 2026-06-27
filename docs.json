@@ -11,22 +11,31 @@
   "navigation": {
     "pages": [
       {
-        "group": "Introducción",
+        "group": "Empezar",
         "pages": [
           "index"
         ]
       },
       {
-        "group": "Guías",
+        "group": "Para personas",
         "pages": [
-          "clientes",
-          "comercios",
-          "mcp"
+          "gastos-por-whatsapp",
+          "presupuestos-y-ahorro",
+          "cupones-sellos-y-premios"
         ]
       },
       {
-        "group": "Referencia",
+        "group": "Para comercios",
         "pages": [
+          "comercios",
+          "programa-de-fidelizacion",
+          "analitica-de-clientes"
+        ]
+      },
+      {
+        "group": "Para desarrolladores",
+        "pages": [
+          "mcp",
           "convenciones-api"
         ]
       }
