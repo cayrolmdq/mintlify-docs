@@ -6,8 +6,8 @@
 
 ## About this project
 
-- This is the functional documentation site for **Gastuki** (expense tracking via
-  WhatsApp + loyalty/analytics for merchants, plus an MCP server for AI agents).
+- This is the functional documentation site for **Gastuki** (customer loyalty via
+  WhatsApp + analytics for merchants, plus an MCP server for AI agents).
 - It is built on [Mintlify](https://mintlify.com)
 - Content is written in **Spanish (Argentina)**
 - Pages are MDX files with YAML frontmatter
@@ -21,7 +21,6 @@
 - **Cliente / Usuario final**: end user, identified by their WhatsApp phone number
 - **Comercio / Merchant**: a registered business (rutas `/merchant/*`)
 - **Sello (stamp)**, **Cupón (coupon)**, **Happy Moment / Ruleta**: loyalty primitives
-- Routes under `/merchant/*` use **snake_case**; all other routes use **camelCase**
 
 ## Style preferences
 
@@ -29,7 +28,7 @@ Audience by section:
 
 - **Público general (SEO/AEO):** todo salvo "Para desarrolladores". Escribir para
   cualquier persona, no para perfiles técnicos.
-- **Técnico:** la sección "Para desarrolladores" (`mcp.mdx`, `convenciones-api.mdx`).
+- **Técnico:** la sección "Para desarrolladores" (`mcp.mdx`).
 
 Reglas para las páginas de público general:
 
@@ -46,3 +45,5 @@ Reglas para las páginas de público general:
 
 - Documentar **comportamiento funcional y beneficios**, no implementación interna
 - No documentar operaciones de admin interno ni detalles sensibles de seguridad
+- No documentar finanzas personales (gastos, ingresos, presupuestos): Gastuki es
+  solo fidelización para comercios

@@ -19,8 +19,6 @@
       {
         "group": "Para personas",
         "pages": [
-          "gastos-por-whatsapp",
-          "presupuestos-y-ahorro",
           "cupones-sellos-y-premios"
         ]
       },
@@ -35,8 +33,7 @@
       {
         "group": "Para desarrolladores",
         "pages": [
-          "mcp",
-          "convenciones-api"
+          "mcp"
         ]
       }
     ],
